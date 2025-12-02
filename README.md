@@ -34,10 +34,10 @@ You’ll be prompted to enter a network interface name, for example:
 wlan0, wlp3s0 (Wi-Fi)
 eth0, enp3s0 (Ethernet)
 
-🔍 Code Walkthrough (Line by Line Sections)
+## 🔍 Code Walkthrough (Line by Line Sections)
 Below is an explanation of each important part of the code.
 
-1. File Header and Includes
+## 1. File Header and Includes
 c
 Copy code
 // netspeed_graph.c
@@ -61,9 +61,7 @@ The comments explain what the program does and how to compile/run it.
 
 #include <unistd.h> – for sleep().
 
-2. Configuration Macros
-c
-Copy code
+## 2. Configuration Macros
 #define TOTAL_TIME 10       // total duration in seconds
 #define SAMPLE_INTERVAL 1   // sample every 1 second
 #define MAX_BAR_WIDTH 50    // characters in graph bar
@@ -75,9 +73,7 @@ MAX_BAR_WIDTH – maximum length of the bar graph (50 # characters).
 
 You can change these values to monitor for longer or shorter periods, or adjust how wide the bars are.
 
-3. Reading Network Stats from /proc/net/dev
-c
-Copy code
+## 3. Reading Network Stats from /proc/net/dev
 // Read network bytes for a given interface
 int read_bytes(const char *iface, unsigned long long *rx, unsigned long long *tx) {
     FILE *fp = fopen("/proc/net/dev", "r");
@@ -85,10 +81,8 @@ int read_bytes(const char *iface, unsigned long long *rx, unsigned long long *tx
         perror("Error opening /proc/net/dev");
         return -1;
     }
-
     char line[256];
     *rx = *tx = 0;
-
     while (fgets(line, sizeof(line), fp)) {
         // Look for the interface name followed by ":" to avoid partial matches
         char *pos = strstr(line, iface);
@@ -112,7 +106,6 @@ int read_bytes(const char *iface, unsigned long long *rx, unsigned long long *tx
             }
         }
     }
-
     fclose(fp);
     return -1;
 }
@@ -140,23 +133,19 @@ Closes the file and returns 0 (success).
 
 If no matching interface is found, or if opening the file fails, the function returns -1.
 
-4. Function to Draw a Bar
-c
-Copy code
+## 4. Function to Draw a Bar
 // Draw a horizontal bar for a given Mbps value
 void draw_bar(double mbps) {
     // Simple scaling: 1 Mbps -> 1 char (you can tweak)
     int width = (int)mbps;
     if (width > MAX_BAR_WIDTH) width = MAX_BAR_WIDTH;
     if (width < 0) width = 0;
-
     for (int i = 0; i < width; i++) {
         putchar('#');
     }
     putchar('\n');
 }
 What this does:
-
 Converts a speed value in Mbps into a number of characters.
 
 width ≈ mbps (e.g., 12.5 Mbps → 12 # characters).
@@ -169,9 +158,7 @@ This is a simple ASCII “graph” representation of the speed.
 
 You can modify the scaling (e.g., int width = (int)(mbps / 2); for 1 # per 2 Mbps).
 
-5. main() – Program Flow
-c
-Copy code
+## 5. main() – Program Flow
 int main() {
     char iface[32];
     printf("Enter network interface (e.g. eth0, wlan0, enp3s0): ");
@@ -187,9 +174,7 @@ Reads the interface name with scanf.
 
 If input fails, exits with an error.
 
-6. Initial Snapshot of Bytes
-c
-Copy code
+## 6. Initial Snapshot of Bytes
     unsigned long long prev_rx, prev_tx, cur_rx, cur_tx;
 
     if (read_bytes(iface, &prev_rx, &prev_tx) != 0) {
@@ -197,16 +182,11 @@ Copy code
         return 1;
     }
 Declares variables for previous and current RX/TX bytes.
-
 Calls read_bytes once to get the starting byte counts (prev_rx and prev_tx).
-
 If that fails, prints an error message and exits.
-
 This “initial snapshot” is used as a baseline to calculate how much data flows each second.
 
-7. Setup for Sampling
-c
-Copy code
+## 7. Setup for Sampling
     int samples = TOTAL_TIME / SAMPLE_INTERVAL;
     double speeds[samples];
     double sum_mbps = 0.0;
@@ -221,9 +201,7 @@ sum_mbps – used later to calculate the average speed.
 
 Prints a short message explaining what will happen and how the graph is scaled.
 
-8. Sampling Loop
-c
-Copy code
+## 8. Sampling Loop
     for (int i = 0; i < samples; i++) {
         sleep(SAMPLE_INTERVAL);
         if (read_bytes(iface, &cur_rx, &cur_tx) != 0) {
@@ -246,13 +224,8 @@ Each iteration does:
 
 sleep(SAMPLE_INTERVAL);
 → Waits 1 second before taking a new sample.
-
 Calls read_bytes again to get cur_rx and cur_tx.
-
 Computes the difference since the last sample:
-
-c
-Copy code
 rxdiff = cur_rx - prev_rx;
 txdiff = cur_tx - prev_tx;
 (with checks to avoid negative values if counters wrap around).
@@ -260,25 +233,17 @@ txdiff = cur_tx - prev_tx;
 Updates prev_rx / prev_tx for the next loop.
 
 Converts bytes to Mbps:
-
-c
-Copy code
 total_bits = (rxdiff + txdiff) * 8
 mbps = total_bits / (SAMPLE_INTERVAL * 1,000,000)
 Stores the speed in speeds[i] and adds it to sum_mbps.
 
 Prints a line like:
-
-text
-Copy code
 t =  1s |   5.23 Mbps | #####
 and uses draw_bar(mbps) to draw the ASCII bar.
 
 So for each second you get a timestamp, the measured speed, and a visual bar.
 
-9. Average Speed and Program End
-c
-Copy code
+## 9. Average Speed and Program End
     double avg_mbps = sum_mbps / samples;
     printf("\nAverage speed over %d seconds: %.2f Mbps\n", TOTAL_TIME, avg_mbps);
 
