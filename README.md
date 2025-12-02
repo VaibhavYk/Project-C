@@ -109,11 +109,17 @@ You can change these values to monitor for longer or shorter periods, or adjust 
     return -1;
     }
 What this function does:
+
 Opens /proc/net/dev, which contains per-interface network statistics.
+
 Initializes *rx and *tx to 0.
+
 Reads each line of /proc/net/dev:
+
 Uses strstr(line, iface) to find the requested interface name in the line.
+
 The pos == line + strspn(line, " ") check ensures the interface name appears at the start of the line (after leading spaces), to avoid partial matches.
+
 If the line matches:
 
 sscanf parses the line into:
