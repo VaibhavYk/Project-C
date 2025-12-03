@@ -1,10 +1,3 @@
-// netspeed_graph.c
-// Live ASCII graph of network speed on Linux using /proc/net/dev
-// Samples every 1 second for 10 seconds and prints a bar graph.
-//
-// Compile: g++ netspeed_graph.c -o netspeed_graph
-// Run:     ./netspeed_graph
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
