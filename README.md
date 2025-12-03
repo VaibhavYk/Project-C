@@ -1,4 +1,4 @@
-# netspeed_dual_ping.c
+# Netspeed_dual_ping.c
 
 This C program measures:
 
