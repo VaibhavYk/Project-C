@@ -1,0 +1,17 @@
+Enter network interface (e.g. eth0, wlan0, enp3s0): wlan0
+
+Measuring network speed for 10 seconds...
+
+Second  1 | Download:    4.13 Mbps | Upload:    0.11 Mbps
+Second  2 | Download:   19.44 Mbps | Upload:    0.46 Mbps
+Second  3 | Download:   19.77 Mbps | Upload:    0.46 Mbps
+Second  4 | Download:   18.17 Mbps | Upload:    0.45 Mbps
+Second  5 | Download:   17.87 Mbps | Upload:    0.45 Mbps
+Second  6 | Download:   13.25 Mbps | Upload:    0.26 Mbps
+Second  7 | Download:   20.23 Mbps | Upload:    0.48 Mbps
+Second  8 | Download:   16.24 Mbps | Upload:    0.39 Mbps
+Second  9 | Download:   19.61 Mbps | Upload:    0.45 Mbps
+Second 10 | Download:   20.99 Mbps | Upload:    0.47 Mbps
+
+Average Download Speed: 16.97 Mbps
+Average Upload Speed:   0.40 Mbps
