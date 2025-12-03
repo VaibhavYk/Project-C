@@ -1,10 +1,3 @@
-// netspeed_dual_ping.c
-// Measures download (rx), upload (tx) speed and ping on Linux.
-// Samples every 1 second for 10 seconds, prints Mbps + ping in ms.
-//
-// Compile: g++ netspeed_dual_ping.c -o netspeed_dual_ping
-// Run:     ./netspeed_dual_ping
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
