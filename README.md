@@ -1,103 +1,83 @@
-# netspeed_graph
+# netspeed_dual_ping.c
 
-A small **Linux CLI tool in C** that shows a simple **ASCII bar graph** of your network speed (in Mbps) over 10 seconds.
+This C program measures:
 
-It:
+- **Download speed** (received bytes → Mbps)  
+- **Upload speed** (transmitted bytes → Mbps)  
+- **Ping latency** (round-trip time in ms)
 
-- Reads network statistics from `/proc/net/dev`
-- Monitors a specific network interface (e.g. `wlan0`, `eth0`, `enp3s0`)
-- Samples every **1 second** for **10 seconds**
-- Prints a text-based bar for each sample (`#` ≈ 1 Mbps)
-- Calculates and prints the **average speed** at the end
-
----
-
-## 🧩 Requirements
-
-- Linux system with `/proc/net/dev` (most distros have this)
-- `gcc` or `g++` (any C/C++ compiler)
-- A terminal (VS Code built-in terminal works fine)
+It runs on **Linux**, reads data from `/proc/net/dev`, and uses the system `ping` command to measure latency.  
+Sampling is done **every 1 second for 10 seconds**, then it prints average values.
 
 ---
 
-## ⚙️ Building and Running
-
-Save your code as:
-
-    netspeed_graph.c
-Compile:
-
-    g++ netspeed_graph.c -o netspeed_graph
-    # or
-    gcc netspeed_graph.c -o netspeed_graph
-    
-Run:
-
-    ./netspeed_graph
-You’ll be prompted to enter a network interface name, for example:
-
-    wlan0, wlp3s0 (Wi-Fi)
-    eth0, enp3s0 (Ethernet)
-
-## 🔍 Code Walkthrough (Line by Line Sections)
-Below is an explanation of each important part of the code.
-
-## 1. File Header and Includes
-    // netspeed_graph.c
-    // Live ASCII graph of network speed on Linux using /proc/net/dev
-    // Samples every 1 second for 10 seconds and prints a bar graph.
-    // Compile: g++ netspeed_graph.c -o netspeed_graph
-    // Run:     ./netspeed_graph
-
+## 1. File Header & Includes
     #include <stdio.h>
     #include <stdlib.h>
     #include <string.h>
     #include <unistd.h>
-    
-The comments explain what the program does and how to compile/run it.
+What this part does:
+The comments at the top describe:
 
-    #include <stdio.h> – for printf, scanf, FILE, etc.
-    #include <stdlib.h> – for general utilities (exit, etc.).
-    #include <string.h> – for string functions like strstr.
-    #include <unistd.h> – for sleep().
+File name
 
-## 2. Configuration Macros
-    #define TOTAL_TIME 10       // total duration in seconds
-    #define SAMPLE_INTERVAL 1   // sample every 1 second
-    #define MAX_BAR_WIDTH 50    // characters in graph bar
-    TOTAL_TIME – total measurement time (10 seconds).
-    SAMPLE_INTERVAL – how often to sample (1 second).
-    MAX_BAR_WIDTH – maximum length of the bar graph (50 # characters).
+Purpose of the program
 
-You can change these values to monitor for longer or shorter periods, or adjust how wide the bars are.
+How often samples are taken
 
-## 3. Reading Network Stats from /proc/net/dev
+How to compile and run the program
 
-    // Read network bytes for a given interface
+The #include lines pull in standard C libraries:
+
+stdio.h → printf, scanf, fopen, fgets, etc.
+
+stdlib.h → exit, popen, system, etc.
+
+string.h → strstr, strspn, strlen for string operations
+
+unistd.h → sleep() for 1-second intervals
+
+These are the basic building blocks for I/O, string handling, and timing.
+
+## 2. Macros (Constants)
+
+    #define TOTAL_TIME 10       // measurement duration in seconds
+    #define SAMPLE_INTERVAL 1   // seconds
+What this part does:
+TOTAL_TIME → for how many seconds the test runs (10 seconds).
+
+SAMPLE_INTERVAL → how often we sample network stats (every 1 second).
+
+Using #define makes it easier to change duration or sampling rate without editing code logic.
+
+## 3. read_bytes – Reading RX/TX from /proc/net/dev
+    // ---------- Read RX/TX bytes for a given interface ----------
+
     int read_bytes(const char *iface, unsigned long long *rx, unsigned long long *tx) {
     FILE *fp = fopen("/proc/net/dev", "r");
     if (!fp) {
         perror("Error opening /proc/net/dev");
         return -1;
     }
+
     char line[256];
     *rx = *tx = 0;
+
     while (fgets(line, sizeof(line), fp)) {
-        // Look for the interface name followed by ":" to avoid partial matches
         char *pos = strstr(line, iface);
-        if (pos && pos == line + strspn(line, " ")) { // interface at start (ignoring spaces)
-            // Format in /proc/net/dev:
-            // Inter-|   Receive                                                |  Transmit
-            //  face |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed
+        if (pos && pos == line + strspn(line, " ")) {
+
             char iface_name[32];
             unsigned long long rbytes, rpackets, rerrs, rdrop, rfifo, rframe, rcompressed, rmulticast;
             unsigned long long tbytes, tpackets, terrs, tdrop, tfifo, tcolls, tcarrier, tcompressed;
+
             int n = sscanf(line,
                            " %[^:]: %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
                            iface_name,
                            &rbytes, &rpackets, &rerrs, &rdrop, &rfifo, &rframe, &rcompressed, &rmulticast,
                            &tbytes, &tpackets, &terrs, &tdrop, &tfifo, &tcolls, &tcarrier, &tcompressed);
-            if (n >= 10) { // we at least got rbytes and tbytes
+
+            if (n >= 10) {
                 *rx = rbytes;
                 *tx = tbytes;
                 fclose(fp);
@@ -105,57 +85,116 @@ You can change these values to monitor for longer or shorter periods, or adjust 
             }
         }
     }
+
     fclose(fp);
     return -1;
     }
 What this function does:
+Purpose:
+Reads the current number of bytes received (rx) and transmitted (tx) for a given network interface (like wlan0 or eth0).
 
-Opens /proc/net/dev, which contains per-interface network statistics.
+Step-by-step:
 
-Initializes *rx and *tx to 0.
+fopen("/proc/net/dev", "r");
+Opens the special Linux file that contains network stats for all interfaces.
 
-Reads each line of /proc/net/dev:
+Initialize *rx and *tx to 0 in case interface is not found.
 
-Uses strstr(line, iface) to find the requested interface name in the line.
+while (fgets(line, sizeof(line), fp))
+Reads the file line by line.
 
-The pos == line + strspn(line, " ") check ensures the interface name appears at the start of the line (after leading spaces), to avoid partial matches.
+strstr(line, iface) and pos == line + strspn(line, " ")
 
-If the line matches:
+Looks for the interface name in the line.
 
-sscanf parses the line into:
+Ensures it appears at the start of the line (after spaces), so you don’t get partial matches.
 
-rbytes (received bytes), tbytes (transmitted bytes), and other stats.
-Stores rbytes into *rx and tbytes into *tx.
-Closes the file and returns 0 (success).
+Long sscanf(...)
+Parses the interface line, which looks like:
 
-If no matching interface is found, or if opening the file fails, the function returns -1.
+wlan0:  bytes packets errs drop fifo frame compressed multicast  bytes packets errs drop fifo colls carrier compressed
+It extracts:
 
-## 4. Function to Draw a Bar
-    // Draw a horizontal bar for a given Mbps value
-    void draw_bar(double mbps) {
-    // Simple scaling: 1 Mbps -> 1 char (you can tweak)
-    int width = (int)mbps;
-    if (width > MAX_BAR_WIDTH) width = MAX_BAR_WIDTH;
-    if (width < 0) width = 0;
-    for (int i = 0; i < width; i++) {
-        putchar('#');
+rbytes → received bytes
+
+tbytes → transmitted bytes
+(The rest are other statistics not used here.)
+
+If successful (n >= 10):
+
+*rx = rbytes;
+
+*tx = tbytes;
+
+Close the file and return 0 (success).
+
+If the function cannot find the interface or parse it, it returns -1.
+
+This function is called repeatedly to track how many bytes have passed through the interface over time.
+
+## 4. measure_ping_ms – Measuring Ping Using ping Command
+
+    // ---------- Measure ping using "ping -c 1" and parse time=...ms ----------
+
+    double measure_ping_ms(const char *host) {
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "ping -c 1 -w 1 %s 2>/dev/null", host);
+
+    FILE *fp = popen(cmd, "r");
+    if (!fp) {
+        // Could not run ping
+        return -1.0;
     }
-    putchar('\n');
+
+    char line[256];
+    double ping_ms = -1.0;
+
+    while (fgets(line, sizeof(line), fp)) {
+        // Look for "time=" substring
+        char *pos = strstr(line, "time=");
+        if (pos) {
+            // Example: "time=23.5 ms"
+            if (sscanf(pos, "time=%lf", &ping_ms) == 1) {
+                break;
+            }
+        }
     }
-What this does:
-Converts a speed value in Mbps into a number of characters.
 
-width ≈ mbps (e.g., 12.5 Mbps → 12 # characters).
+    pclose(fp);
+    return ping_ms; // -1.0 if not found
+    }
+What this function does:
+Purpose:
+Runs a system ping command and extracts the round-trip time (ms) from its output.
 
-Caps the width at MAX_BAR_WIDTH so very high speeds don’t overflow.
+How it works:
 
-Prints that many # characters, then a newline.
+Builds a command string:
 
-This is a simple ASCII “graph” representation of the speed.
+ping -c 1 -w 1 <host>
+-c 1 → send 1 ICMP packet
 
-You can modify the scaling (e.g., int width = (int)(mbps / 2); for 1 # per 2 Mbps).
+-w 1 → wait at most 1 second
 
-## 5. main() – Program Flow
+2>/dev/null → hide error messages
+
+popen(cmd, "r")
+Runs the command and opens a pipe for reading its output.
+
+Reads each output line with fgets.
+
+For each line, it searches for "time=", e.g.:
+
+    int
+    time=23.5 ms
+Uses sscanf(pos, "time=%lf", &ping_ms) to parse the number after time= into ping_ms.
+
+If time= is never found, it returns -1.0 to indicate failure.
+
+This function is used once per second in the main loop, and the ping results are averaged.
+
+## 5. main – Overall Program Flow
+
     int main() {
     char iface[32];
     printf("Enter network interface (e.g. eth0, wlan0, enp3s0): ");
@@ -163,96 +202,167 @@ You can modify the scaling (e.g., int width = (int)(mbps / 2); for 1 # per 2 Mbp
         printf("Invalid input.\n");
         return 1;
     }
-Declares a buffer iface to store the interface name.
+What this part does:
+Declares a string iface to store the network interface name.
 
-Prompts the user to enter an interface.
+Prompts the user to enter the interface.
 
-Reads the interface name with scanf.
+Uses scanf to read it (up to 31 characters to avoid buffer overflow).
 
 If input fails, exits with an error.
 
-## 6. Initial Snapshot of Bytes
+## 5.1 Initial Setup and First Reading
+
     unsigned long long prev_rx, prev_tx, cur_rx, cur_tx;
 
     if (read_bytes(iface, &prev_rx, &prev_tx) != 0) {
-        printf("Interface '%s' not found or error reading /proc/net/dev.\n", iface);
+        printf("Error: Interface '%s' not found or cannot read /proc/net/dev.\n", iface);
         return 1;
     }
-Declares variables for previous and current RX/TX bytes.
 
-Calls read_bytes once to get the starting byte counts (prev_rx and prev_tx).
-
-If that fails, prints an error message and exits.
-
-This “initial snapshot” is used as a baseline to calculate how much data flows each second.
-
-## 7. Setup for Sampling
     int samples = TOTAL_TIME / SAMPLE_INTERVAL;
-    double speeds[samples];
-    double sum_mbps = 0.0;
+    double total_rx_mbps = 0.0;
+    double total_tx_mbps = 0.0;
+    double total_ping_ms = 0.0;
+    int ping_count = 0;
 
     printf("\nMeasuring for %d seconds...\n", TOTAL_TIME);
-    printf("Each '#' is ~1 Mbps (capped at %d chars)\n\n", MAX_BAR_WIDTH);
-samples – how many data points will be collected (10 seconds / 1 second = 10 samples).
+    printf("Showing Download (Mbps), Upload (Mbps), Ping (ms)\n\n");
+What this part does:
+Declares counters to hold previous and current RX/TX values.
 
- speeds[] – array to store each second’s Mbps value.
+Calls read_bytes once to get the initial RX/TX counters.
 
-sum_mbps – used later to calculate the average speed.
+If that fails, prints an error and exits.
 
-Prints a short message explaining what will happen and how the graph is scaled.
+Calculates how many samples will be taken (10 seconds / 1 second = 10 samples).
 
-## 8. Sampling Loop
+Initializes totals for download, upload, and ping to compute averages later.
+
+Prints a message so the user knows the test duration and what will be shown.
+
+## 5.2 Main Sampling Loop
+
     for (int i = 0; i < samples; i++) {
         sleep(SAMPLE_INTERVAL);
+
         if (read_bytes(iface, &cur_rx, &cur_tx) != 0) {
-            printf("Error: failed to read /proc/net/dev during sampling.\n");
+            printf("Error reading /proc/net/dev.\n");
             return 1;
         }
+
         unsigned long long rxdiff = (cur_rx >= prev_rx) ? (cur_rx - prev_rx) : 0;
         unsigned long long txdiff = (cur_tx >= prev_tx) ? (cur_tx - prev_tx) : 0;
+
         prev_rx = cur_rx;
         prev_tx = cur_tx;
-        double interval = (double)SAMPLE_INTERVAL;
-        double total_bits = (double)(rxdiff + txdiff) * 8.0;
-        double mbps = total_bits / (interval * 1000000.0);
-        speeds[i] = mbps;
-        sum_mbps += mbps;
-        printf("t = %2ds | %7.2f Mbps | ", (i + 1) * SAMPLE_INTERVAL, mbps);
-        draw_bar(mbps);
-    }
-Each iteration does:
 
-    sleep(SAMPLE_INTERVAL);
-→ Waits 1 second before taking a new sample.
-Calls read_bytes again to get cur_rx and cur_tx.
-Computes the difference since the last sample:
+        double download_mbps = ((double)rxdiff * 8.0) / (SAMPLE_INTERVAL * 1000000.0);
+        double upload_mbps   = ((double)txdiff * 8.0) / (SAMPLE_INTERVAL * 1000000.0);
+
+        total_rx_mbps += download_mbps;
+        total_tx_mbps += upload_mbps;
+
+        // Measure ping to Google DNS (or any host you like)
+        double ping_ms = measure_ping_ms("10.249.66.207");
+        if (ping_ms >= 0.0) {
+            total_ping_ms += ping_ms;
+            ping_count++;
+            printf("Second %2d | Down: %7.2f Mbps | Up: %7.2f Mbps | Ping: %6.2f ms\n",
+                   i + 1, download_mbps, upload_mbps, ping_ms);
+        } else {
+            printf("Second %2d | Down: %7.2f Mbps | Up: %7.2f Mbps | Ping:   N/A\n",
+                   i + 1, download_mbps, upload_mbps);
+        }
+    }
+What this part does:
+This is the core logic that runs once per second.
+
+sleep(SAMPLE_INTERVAL);
+
+Waits for 1 second between measurements.
+
+Calls read_bytes to get new RX and TX byte counters.
+
+Calculates the change (difference) in bytes:
 
     rxdiff = cur_rx - prev_rx;
     txdiff = cur_tx - prev_tx;
-(with checks to avoid negative values if counters wrap around).
+That gives the number of bytes received/transmitted during the last 1 second.
 
-    Updates prev_rx / prev_tx for the next loop.
+Updates prev_rx and prev_tx for the next iteration.
 
-Converts bytes to Mbps:
-total_bits = (rxdiff + txdiff) * 8
-mbps = total_bits / (SAMPLE_INTERVAL * 1,000,000)
-Stores the speed in speeds[i] and adds it to sum_mbps.
+Converts bytes → bits → Mbps:
 
-Prints a line like:
+    download_mbps = (rxdiff * 8) / (seconds * 1,000,000);
+    upload_mbps   = (txdiff * 8) / (seconds * 1,000,000);
+   Accumulates totals for averaging later:
 
-    t =  1s |   5.23 Mbps | #####
-    and uses draw_bar(mbps) to draw the ASCII bar.
+total_rx_mbps += download_mbps;
+total_tx_mbps += upload_mbps;
+Calls measure_ping_ms("10.249.66.207");
 
-So for each second you get a timestamp, the measured speed, and a visual bar.
+Pings the given host once.
 
-## 9. Average Speed and Program End
-    double avg_mbps = sum_mbps / samples;
-    printf("\nAverage speed over %d seconds: %.2f Mbps\n", TOTAL_TIME, avg_mbps);
+Returns ping in ms or -1.0 if it failed.
+
+If ping succeeded (ping_ms >= 0.0):
+
+Adds it to total_ping_ms.
+
+Increments ping_count.
+
+Prints download, upload, and ping values.
+
+If ping failed:
+
+Prints Ping: N/A but still shows speeds.
+
+## 5.3 Final Averages and Exit
+
+    printf("\nAverage Download Speed: %.2f Mbps\n", total_rx_mbps / samples);
+    printf("Average Upload Speed:   %.2f Mbps\n", total_tx_mbps / samples);
+
+    if (ping_count > 0) {
+        printf("Average Ping:           %.2f ms\n", total_ping_ms / ping_count);
+    } else {
+        printf("Average Ping:           N/A (ping failed)\n");
+    }
 
     return 0;
-}
-After the loop, calculates the average Mbps over all samples.
+    }
+What this part does:
+Computes:
 
-Prints the average.
+Average download speed = total of all download samples / number of samples
 
-Returns 0 to indicate success.
+Average upload speed = total of all upload samples / number of samples
+
+Ping average is calculated only if at least one ping succeeded (ping_count > 0).
+
+Prints final summary.
+
+return 0; → program completed successfully.
+
+Summary of Code Sections
+Header & Includes → set up environment and libraries
+
+Macros → constants for time configuration
+
+read_bytes → gets raw RX/TX byte counters from /proc/net/dev
+
+measure_ping_ms → runs ping and parses the time= output
+
+main
+
+Reads interface from user
+
+Takes initial snapshot
+
+Loops for TOTAL_TIME seconds
+
+Calculates per-second download/upload speed
+
+Measures ping
+
+Prints values and calculates averages
